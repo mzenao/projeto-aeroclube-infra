@@ -1,0 +1,1 @@
+export const activities=[{id:1,description:'Chamado TI-0248 criado via WhatsApp',author:'Sistema',at:'Hoje, 10:42'},{id:2,description:'Equipamento IMP-012 enviado para manutenção',author:'Lucas Almeida',at:'Hoje, 09:18'}]

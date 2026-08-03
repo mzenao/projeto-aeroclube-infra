@@ -1,0 +1,1 @@
+export const infrastructure=[{id:1,name:'Servidor de Arquivos',type:'Servidor',status:'Indisponível'},{id:2,name:'Link Fibra Principal',type:'Internet',status:'Operacional'},{id:3,name:'Switch Core',type:'Switch',status:'Alerta'}]

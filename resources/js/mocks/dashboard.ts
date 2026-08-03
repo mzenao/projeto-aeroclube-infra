@@ -1,0 +1,1 @@
+export const dashboardSeries={tickets:[{day:'Seg',opened:6,resolved:4},{day:'Ter',opened:8,resolved:5},{day:'Qua',opened:5,resolved:4},{day:'Qui',opened:10,resolved:7},{day:'Sex',opened:9,resolved:6},{day:'Sáb',opened:3,resolved:2},{day:'Dom',opened:2,resolved:2}],maintenanceCosts:[2800,1950,3400,2200,4100,2870]}

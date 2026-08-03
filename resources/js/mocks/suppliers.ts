@@ -1,0 +1,1 @@
+export const suppliers=[{id:1,name:'Tech Minas Ltda.',category:'Hardware e periféricos',contact:'Carlos Andrade',status:'Ativo'},{id:2,name:'NetPro Telecom',category:'Conectividade',contact:'Fernanda Rocha',status:'Ativo'}]
