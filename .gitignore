@@ -3,3 +3,4 @@
 /.env
 /vendor
 *.log
+/projeto-aeroclube-infra
