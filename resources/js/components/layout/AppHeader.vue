@@ -99,12 +99,9 @@ function logout() {
       <Search class="absolute left-3 top-2.5 size-4 text-slate-400" /><input
         id="global-search"
         v-model="query"
-        class="field pl-9 pr-16"
+        class="field pl-9"
         placeholder="Buscar chamados, equipamentos ou pessoas"
-      /><kbd
-        class="absolute right-2 top-2 rounded border px-1.5 py-0.5 text-[10px] text-slate-400"
-        >Ctrl K</kbd
-      >
+      />
     </form>
     <div class="ml-auto flex items-center gap-2">
       <div ref="notificationsMenu" class="relative">
