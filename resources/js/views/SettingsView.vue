@@ -18,10 +18,42 @@ import {
   Download,
   RefreshCw,
   Save,
+  Upload,
+  Trash2,
+  Plane,
 } from "lucide-vue-next";
 const app = useAppStore(),
   auth = useAuthStore(),
   section = ref("Organização");
+const fileInput = ref<HTMLInputElement | null>(null);
+const logoError = ref("");
+function onLogoChange(e: Event) {
+  logoError.value = "";
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  if (file.type !== "image/png") {
+    logoError.value = "Envie um arquivo PNG.";
+    input.value = "";
+    return;
+  }
+  if (file.size > 1024 * 1024) {
+    logoError.value = "A imagem deve ter até 1MB.";
+    input.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    app.setLogo(reader.result as string);
+    app.toast("Logo atualizada", "A nova logo foi aplicada em todo o sistema.");
+  };
+  reader.readAsDataURL(file);
+}
+function removeLogo() {
+  app.setLogo(null);
+  if (fileInput.value) fileInput.value.value = "";
+  app.toast("Logo removida", "O ícone padrão voltou a ser exibido.", "info");
+}
 const sections = [
   ["Organização", Building2],
   ["Usuários", Users],
@@ -90,7 +122,55 @@ const sections = [
           <div>
             <label class="label">Telefone</label
             ><input class="field" value="(32) 3233-1000" />
-          </div></div></template
+          </div>
+        </div>
+        <div class="mt-6 max-w-2xl border-t pt-5 dark:border-slate-700">
+          <label class="label">Logo do sistema</label>
+          <div class="mt-2 flex items-center gap-4">
+            <div
+              class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-slate-50 dark:border-slate-600 dark:bg-slate-700"
+            >
+              <img
+                v-if="app.logo"
+                :src="app.logo"
+                alt="Logo atual"
+                class="size-full object-contain"
+              /><Plane v-else class="size-7 -rotate-12 text-slate-400" />
+            </div>
+            <div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  @click="fileInput?.click()"
+                >
+                  <Upload class="size-4" />Selecionar imagem PNG</button
+                ><button
+                  v-if="app.logo"
+                  type="button"
+                  class="btn btn-secondary text-red-600"
+                  @click="removeLogo"
+                >
+                  <Trash2 class="size-4" />Remover
+                </button>
+              </div>
+              <p class="mt-2 text-[11px] text-slate-400">
+                PNG, fundo transparente recomendado, até 1MB. Usada na barra
+                lateral e na tela de login.
+              </p>
+              <p v-if="logoError" class="mt-1 text-[11px] text-red-600">
+                {{ logoError }}
+              </p>
+            </div>
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/png"
+              class="hidden"
+              @change="onLogoChange"
+            />
+          </div>
+        </div></template
       ><template v-else-if="section === 'Aparência'"
         ><h2 class="text-base font-bold">Aparência</h2>
         <p class="mt-1 text-xs text-slate-500">
