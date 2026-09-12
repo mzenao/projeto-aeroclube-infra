@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
   Search,
   Bell,
@@ -16,7 +16,43 @@ const app = useAppStore(),
   router = useRouter(),
   query = ref(""),
   notificationsOpen = ref(false),
-  profileOpen = ref(false);
+  profileOpen = ref(false),
+  notificationsMenu = ref<HTMLElement | null>(null),
+  profileMenu = ref<HTMLElement | null>(null);
+const initials = computed(() =>
+  (auth.user?.name || "")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase() || "AT",
+);
+function onClickOutside(e: MouseEvent) {
+  const target = e.target as Node;
+  if (
+    notificationsOpen.value &&
+    notificationsMenu.value &&
+    !notificationsMenu.value.contains(target)
+  )
+    notificationsOpen.value = false;
+  if (profileOpen.value && profileMenu.value && !profileMenu.value.contains(target))
+    profileOpen.value = false;
+}
+function onEscape(e: KeyboardEvent) {
+  if (e.key === "Escape") {
+    notificationsOpen.value = false;
+    profileOpen.value = false;
+  }
+}
+onMounted(() => {
+  document.addEventListener("click", onClickOutside);
+  document.addEventListener("keydown", onEscape);
+});
+onUnmounted(() => {
+  document.removeEventListener("click", onClickOutside);
+  document.removeEventListener("keydown", onEscape);
+});
 const notifications = ref([
   {
     id: 1,
@@ -56,22 +92,19 @@ function logout() {
 </script>
 <template>
   <header
-    class="fixed right-0 top-0 z-20 flex h-16 items-center border-b border-slate-200 bg-white px-5 transition-all dark:border-slate-700 dark:bg-slate-800"
+    class="fixed right-0 top-0 z-20 flex h-16 items-center border-b border-slate-200 bg-white px-5 transition-all duration-200 dark:border-slate-700 dark:bg-slate-800"
     :class="app.sidebarCollapsed ? 'left-[68px]' : 'left-[232px]'"
   >
     <form class="relative w-[420px]" @submit.prevent="search">
       <Search class="absolute left-3 top-2.5 size-4 text-slate-400" /><input
         id="global-search"
         v-model="query"
-        class="field pl-9 pr-16"
+        class="field pl-9"
         placeholder="Buscar chamados, equipamentos ou pessoas"
-      /><kbd
-        class="absolute right-2 top-2 rounded border px-1.5 py-0.5 text-[10px] text-slate-400"
-        >Ctrl K</kbd
-      >
+      />
     </form>
     <div class="ml-auto flex items-center gap-2">
-      <div class="relative">
+      <div ref="notificationsMenu" class="relative">
         <button
           class="relative flex size-9 items-center justify-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
           title="Notificações"
@@ -128,7 +161,7 @@ function logout() {
         />
       </button>
       <div class="mx-1 h-7 w-px bg-slate-200 dark:bg-slate-600" />
-      <div class="relative">
+      <div ref="profileMenu" class="relative">
         <button
           class="flex items-center gap-2 rounded-md p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700"
           @click="
@@ -139,7 +172,11 @@ function logout() {
           <div
             class="flex size-8 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xs font-bold text-blue-700"
           >
+<<<<<<< HEAD
             <img v-if="auth.user?.avatar" :src="auth.user.avatar" alt="Foto do perfil" class="size-full object-cover"/><span v-else>{{auth.user?.name.split(' ').map(x=>x[0]).slice(0,2).join('')}}</span>
+=======
+            {{ initials }}
+>>>>>>> refs/remotes/origin/main
           </div>
           <div class="text-left">
             <div class="text-xs font-semibold">{{ auth.user?.name }}</div>
