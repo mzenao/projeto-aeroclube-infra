@@ -80,6 +80,12 @@ const routes = [
       },
       {path: ":module(funcionarios|manutencoes|estoque|emprestimos|fornecedores|infraestrutura|conhecimento)/:id",name:"Detalhes do módulo",component:()=>import("@/views/ModuleDetailView.vue")},
       {
+        path: "configuracoes/perfil",
+        name: "Meu perfil",
+        component: () => import("@/views/SettingsView.vue"),
+        meta:{settingsSection:'Meu perfil'},
+      },
+      {
         path: "configuracoes",
         name: "Configurações",
         component: () => import("@/views/SettingsView.vue"),

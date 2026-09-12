@@ -15,8 +15,9 @@ import {
   AlertTriangle,
 } from "lucide-vue-next";
 import { useTicketStore } from "@/stores/tickets";
+import {useRouter} from 'vue-router';
 import { maintenance, equipment } from "@/mocks";
-const store = useTicketStore();
+const store = useTicketStore(),router=useRouter();
 const metrics = [
   [
     "Chamados abertos",
@@ -92,13 +93,18 @@ const bars = [42, 58, 39, 72, 62, 85, 68];
     ><span class="text-xs text-slate-500">Últimos 30 dias</span></PageHeader
   >
   <div class="grid grid-cols-4 gap-3">
-    <router-link v-for="m in metrics" :key="String(m[0])" :to="String(m[5])" class="transition hover:-translate-y-0.5 hover:shadow-md rounded-[10px]">
-    <MetricCard
-      :label="String(m[0])"
-      :value="String(m[1])"
-      :hint="String(m[2])"
-      :color="String(m[3])"
-      :icon="m[4] as any"
+    <router-link
+      v-for="m in metrics"
+      :key="String(m[0])"
+      :to="String(m[5])"
+      class="transition hover:-translate-y-0.5 hover:shadow-md rounded-[10px]"
+    >
+      <MetricCard
+        :label="String(m[0])"
+        :value="String(m[1])"
+        :hint="String(m[2])"
+        :color="String(m[3])"
+        :icon="m[4] as any"
     /></router-link>
   </div>
   <div class="mt-3 grid grid-cols-12 gap-3">
@@ -187,7 +193,6 @@ const bars = [42, 58, 39, 72, 62, 85, 68];
         <thead class="table-head">
           <tr>
             <th class="px-4 py-2.5">Protocolo</th>
-            <th>Título</th>
             <th>Prioridade</th>
             <th>Status</th>
             <th>Atualização</th>
@@ -197,7 +202,8 @@ const bars = [42, 58, 39, 72, 62, 85, 68];
           <tr
             v-for="t in store.items.slice(0, 5)"
             :key="t.id"
-            class="border-t border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700/40"
+            class="cursor-pointer border-t border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700/40"
+            @click="router.push(`/chamados/${t.id}`)"
           >
             <td class="px-4 py-3 font-mono text-blue-600">
               <router-link :to="`/chamados/${t.id}`">{{
@@ -223,19 +229,20 @@ const bars = [42, 58, 39, 72, 62, 85, 68];
       <div class="mt-3 space-y-2">
         <div
           v-for="(a, i) in [
-            'Servidor de arquivos indisponível',
-            'Preventiva do nobreak atrasada',
-            'Estoque de toner abaixo do mínimo',
+            ['Servidor de arquivos indisponível','/infraestrutura/1'],
+            ['Preventiva do nobreak atrasada','/manutencoes/2'],
+            ['Estoque de toner abaixo do mínimo','/estoque/2'],
           ]"
-          :key="a"
-          class="flex gap-3 rounded-md border p-3 dark:border-slate-600"
+          :key="String(a[0])"
+          class="flex cursor-pointer gap-3 rounded-md border p-3 transition hover:border-blue-200 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700/40"
+          @click="router.push(String(a[1]))"
         >
           <AlertTriangle
             class="size-4 shrink-0"
             :class="i === 0 ? 'text-red-500' : 'text-amber-500'"
           />
           <div>
-            <div class="text-xs font-semibold">{{ a }}</div>
+            <div class="text-xs font-semibold">{{ a[0] }}</div>
             <div class="mt-1 text-[10px] text-slate-500">
               Atualizado há {{ i + 1 }}h
             </div>
@@ -249,7 +256,8 @@ const bars = [42, 58, 39, 72, 62, 85, 68];
       <div
         v-for="m in maintenance.slice(0, 3)"
         :key="m.id"
-        class="mt-3 flex items-center border-b pb-3 text-xs last:border-0 dark:border-slate-700"
+        class="mt-3 flex cursor-pointer items-center border-b pb-3 text-xs last:border-0 hover:text-blue-600 dark:border-slate-700"
+        @click="router.push(`/manutencoes/${m.id}`)"
       >
         <div
           class="mr-3 rounded bg-blue-50 px-2 py-1 text-center text-blue-700"
@@ -269,7 +277,8 @@ const bars = [42, 58, 39, 72, 62, 85, 68];
       <div
         v-for="e in equipment.filter((x) => x.tickets > 2).slice(0, 3)"
         :key="e.id"
-        class="mt-3 flex items-center border-b pb-3 text-xs last:border-0 dark:border-slate-700"
+        class="mt-3 flex cursor-pointer items-center border-b pb-3 text-xs last:border-0 hover:text-blue-600 dark:border-slate-700"
+        @click="router.push(`/equipamentos/${e.id}`)"
       >
         <div
           class="mr-3 flex size-8 items-center justify-center rounded bg-slate-100"

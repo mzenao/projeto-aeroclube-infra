@@ -103,7 +103,7 @@ function logout() {
           <button
             v-for="n in notifications"
             :key="n.id"
-            class="flex w-full gap-3 border-b px-4 py-3 text-left hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700"
+            class="flex w-full gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-slate-50 dark:border-slate-700/50 dark:hover:bg-slate-700"
             @click="openNotification(n)"
           >
             <span
@@ -137,9 +137,9 @@ function logout() {
           "
         >
           <div
-            class="flex size-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700"
+            class="flex size-8 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xs font-bold text-blue-700"
           >
-            LA
+            <img v-if="auth.user?.avatar" :src="auth.user.avatar" alt="Foto do perfil" class="size-full object-cover"/><span v-else>{{auth.user?.name.split(' ').map(x=>x[0]).slice(0,2).join('')}}</span>
           </div>
           <div class="text-left">
             <div class="text-xs font-semibold">{{ auth.user?.name }}</div>
@@ -154,7 +154,7 @@ function logout() {
           <button
             class="w-full rounded px-3 py-2 text-left text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
             @click="
-              router.push('/configuracoes');
+              router.push('/configuracoes/perfil');
               profileOpen = false;
             "
           >
