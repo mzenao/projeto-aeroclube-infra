@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ModuleService } from "@/services";
 import type { ModuleRecord } from "@/mocks/modules";
 import { useAppStore } from "@/stores/app";
 import BaseBadge from "@/components/base/BaseBadge.vue";
+import ModuleFields from '@/components/shared/ModuleFields.vue';
+import {moduleStatuses} from '@/services/modules';
+import {formatDate} from '@/utils/dates';
 import KnowledgeEditor from '@/components/shared/KnowledgeEditor.vue';
 import { ArrowLeft, Save, Trash2 } from "lucide-vue-next";
 const route = useRoute(),
   router = useRouter(),
   app = useAppStore(),
-  kind = ({funcionarios:'employees',manutencoes:'maintenance',estoque:'inventory',emprestimos:'loans',fornecedores:'suppliers',infraestrutura:'infrastructure',conhecimento:'knowledge'} as Record<string,string>)[String(route.params.module)],
-  items = ref(ModuleService.list(kind));
-const record = ref<ModuleRecord>({
-  ...(items.value.find((x) => x.id === Number(route.params.id)) ||
-    items.value[0]),
-});
+  kind = computed(()=>({funcionarios:'employees',manutencoes:'maintenance',estoque:'inventory',emprestimos:'loans',fornecedores:'suppliers',infraestrutura:'infrastructure',conhecimento:'knowledge'} as Record<string,string>)[String(route.params.module)]);
+const record=ref<ModuleRecord|null>(null);
+watch(()=>[kind.value,route.params.id],()=>{const item=ModuleService.find(kind.value,Number(route.params.id));record.value=item?{...item}:null},{immediate:true});
 const title = computed(
   () =>
     (
@@ -28,27 +28,14 @@ const title = computed(
         infrastructure: "Infraestrutura",
         knowledge: "Artigo",
       }) as any
-    )[kind],
+    )[kind.value],
 );
-function save() {
-  record.value.updatedAt = "Agora";
-  items.value = items.value.map((x) =>
-    x.id === record.value.id ? record.value : x,
-  );
-  ModuleService.save(kind, items.value);
-  app.toast("Alterações salvas", "O registro foi atualizado localmente.");
-}
-function remove() {
-  if (confirm("Excluir este registro?")) {
-    ModuleService.save(
-      kind,
-      items.value.filter((x) => x.id !== record.value.id),
-    );
-    router.back();
-  }
-}
+function save(){if(!record.value)return;if(!record.value.name.trim()||!record.value.category.trim()){app.toast('Dados incompletos','Informe nome e categoria.','error');return}try{const updated={...record.value,updatedAt:new Date().toISOString()};ModuleService.save(kind.value,ModuleService.list(kind.value).map(x=>x.id===updated.id?updated:x));record.value=ModuleService.find(kind.value,updated.id)||null;app.toast('Alterações salvas','O registro foi atualizado localmente.')}catch(error){app.toast('Falha ao salvar',error instanceof Error?error.message:String(error),'error')}}
+function remove(){if(record.value&&confirm('Excluir este registro?')){ModuleService.save(kind.value,ModuleService.list(kind.value).filter(x=>x.id!==record.value!.id));router.push('/'+route.params.module)}}
 </script>
 <template>
+  <div v-if="!record" class="card p-8"><h1 class="text-xl font-bold">Registro não encontrado</h1><router-link :to="'/'+route.params.module" class="btn btn-secondary mt-4">Voltar para a listagem</router-link></div>
+  <template v-else>
   <button
     class="flex items-center gap-1 text-xs text-slate-500"
     @click="router.back"
@@ -73,7 +60,7 @@ function remove() {
       </button>
     </div>
   </div>
-  <KnowledgeEditor v-if="kind==='knowledge'" :record="record"/>
+  <KnowledgeEditor v-if="kind==='knowledge'" :key="kind+record.id" :record="record" @saved="record=$event"/>
   <div v-else class="mt-4 grid grid-cols-[1fr_300px] gap-4">
     <section class="card grid grid-cols-2 gap-4 p-6">
       <div class="col-span-2">
@@ -86,7 +73,7 @@ function remove() {
       </div>
       <div>
         <label class="label">Status</label
-        ><input v-model="record.status" class="field" />
+        ><select v-model="record.status" class="field"><option v-for="value in [...new Set([record.status,...(moduleStatuses[kind]||[])])]" :key="value">{{value}}</option></select>
       </div>
       <div>
         <label class="label">Responsável / localização</label
@@ -104,6 +91,7 @@ function remove() {
         <label class="label">Telefone</label
         ><input v-model="record.phone" class="field" />
       </div>
+      <ModuleFields :kind="kind" :record="record"/>
       <div class="col-span-2">
         <label class="label">Observações</label
         ><textarea v-model="record.notes" class="field h-32 py-2" />
@@ -113,7 +101,7 @@ function remove() {
       <div class="card p-4">
         <h3 class="text-sm font-bold">Resumo</h3>
         <div class="mt-4 text-xs text-slate-500">Última atualização</div>
-        <b class="text-xs">{{ record.updatedAt }}</b>
+        <b class="text-xs">{{ formatDate(record.updatedAt) }}</b>
         <div class="mt-4 text-xs text-slate-500">Identificador local</div>
         <b class="font-mono text-xs">#{{ record.id }}</b>
       </div>
@@ -126,4 +114,5 @@ function remove() {
       </div>
     </aside>
   </div>
+  </template>
 </template>

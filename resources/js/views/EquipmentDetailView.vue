@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { EquipmentService } from "@/services";
+import {useTicketStore} from '@/stores/tickets';
 import BaseBadge from "@/components/base/BaseBadge.vue";
 import {useAppStore} from '@/stores/app';
 import {
@@ -17,11 +18,9 @@ import {
 const route = useRoute(),
   active = ref("Visão geral"),
   editing=ref(false),app=useAppStore(),
-  e = computed(
-    () =>
-      EquipmentService.find(Number(route.params.id)) ||
-      EquipmentService.list()[0],
-  );
+  e = ref<import('@/types').Equipment|null>(null);
+watch(()=>route.params.id,()=>{const item=EquipmentService.find(Number(route.params.id));e.value=item?{...item}:null;editing.value=false},{immediate:true});
+const ticketStore=useTicketStore(),linkedTickets=computed(()=>ticketStore.items.filter(t=>t.equipment===e.value?.code));
 const tabs = [
   "Visão geral",
   "Especificações",
@@ -32,9 +31,11 @@ const tabs = [
   "Softwares",
   "Rede",
 ];
-function save(){EquipmentService.save(EquipmentService.list().map(x=>x.id===e.value.id?e.value:x));editing.value=false;app.toast('Equipamento atualizado','As alterações foram salvas localmente.')}
+function save(){if(!e.value)return;try{EquipmentService.save(EquipmentService.list().map(x=>x.id===e.value!.id?e.value!:x));editing.value=false;app.toast('Equipamento atualizado','As alterações foram salvas localmente.')}catch(error){app.toast('Falha ao salvar',error instanceof Error?error.message:String(error),'error')}}
 </script>
 <template>
+  <div v-if="!e" class="card p-8"><h1 class="text-xl font-bold">Equipamento não encontrado</h1><router-link to="/equipamentos" class="btn btn-secondary mt-4">Voltar para equipamentos</router-link></div>
+  <template v-else>
   <router-link
     to="/equipamentos"
     class="flex items-center gap-1 text-xs text-slate-500"
@@ -56,9 +57,9 @@ function save(){EquipmentService.save(EquipmentService.list().map(x=>x.id===e.va
       </p>
     </div>
     <div class="ml-auto flex gap-2">
-      <button class="btn btn-secondary" @click="app.toast('Etiqueta preparada',`${e.code} enviado para impressão.`)">
+      <button class="btn btn-secondary" @click="app.toast('Impressão de etiqueta','Funcionalidade demonstrativa; nenhuma impressão foi enviada.','info')">
         <Printer class="size-4" />Etiqueta</button
-      ><button class="btn btn-secondary" @click="app.ticketModalOpen=true">
+      ><button class="btn btn-secondary" @click="app.ticketEquipment=e.code;app.ticketModalOpen=true">
         <Ticket class="size-4" />Abrir chamado</button
       ><button class="btn btn-primary" @click="editing?save():editing=true"><Save v-if="editing" class="size-4"/><Edit3 v-else class="size-4" />{{editing?'Salvar':'Editar'}}</button>
     </div>
@@ -103,6 +104,7 @@ function save(){EquipmentService.save(EquipmentService.list().map(x=>x.id===e.va
           ><b class="float-right">{{ v }}</b>
         </div>
       </div>
+      <div v-else-if="active==='Chamados'" class="mt-4 space-y-3"><router-link v-for="item in linkedTickets" :key="item.id" :to="'/chamados/'+item.id" class="block text-xs text-blue-600">{{item.protocol}} · {{item.title}}</router-link><p v-if="!linkedTickets.length" class="text-xs text-slate-500">Nenhum chamado vinculado.</p></div>
       <div
         v-else
         class="mt-4 rounded-md border border-dashed p-12 text-center text-sm text-slate-400 dark:border-slate-600"
@@ -124,7 +126,7 @@ function save(){EquipmentService.save(EquipmentService.list().map(x=>x.id===e.va
       </div>
       <div class="card p-4">
         <h3 class="text-sm font-bold">Resumo de suporte</h3>
-        <div class="mt-3 text-2xl font-bold">{{ e.tickets }}</div>
+        <div class="mt-3 text-2xl font-bold">{{ linkedTickets.length }}</div>
         <div class="text-xs text-slate-500">chamados vinculados</div>
         <button class="btn btn-secondary mt-3 w-full">
           <Wrench class="size-4" />Registrar manutenção
@@ -139,4 +141,5 @@ function save(){EquipmentService.save(EquipmentService.list().map(x=>x.id===e.va
       </div>
     </aside>
   </div>
+  </template>
 </template>

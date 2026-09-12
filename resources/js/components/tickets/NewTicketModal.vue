@@ -1,38 +1,49 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { X, Paperclip } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useTicketStore } from "@/stores/tickets";
+import {EquipmentService,ModuleService} from '@/services';
+import {readAttachments} from '@/services/attachments';
+import {useAuthStore} from '@/stores/auth';
+import type {Attachment,Priority} from '@/types';
 const app = useAppStore(),
   store = useTicketStore(),
-  errors = ref<Record<string, string>>({}), attachments=ref<string[]>([]);
-function attach(e:Event){attachments.value=Array.from((e.target as HTMLInputElement).files||[]).map(f=>f.name)}
+  errors = ref<Record<string, string>>({}), attachments=ref<Attachment[]>([]), internalNotes=ref(''), reading=ref(false);
+const auth=useAuthStore(),employees=computed(()=>ModuleService.list('employees')),equipment=computed(()=>EquipmentService.list());
+async function attach(e:Event){reading.value=true;try{attachments.value.push(...await readAttachments(Array.from((e.target as HTMLInputElement).files||[]),attachments.value))}catch(error){app.toast('Falha no anexo',String(error instanceof Error?error.message:error),'error')}finally{reading.value=false;(e.target as HTMLInputElement).value=''}}
 const form = reactive({
   requester: "Mariana Costa",
   department: "Secretaria",
   title: "",
   description: "",
   category: "Hardware",
-  priority: "Média" as const,
+  priority: "Média" as Priority,
   equipment: "Não informado",
   status: "Aberto" as const,
   technician: "Não atribuído",
   channel: "Portal",
-  deadline: "07/08/2026 17:00",
+  deadline: "",
   messages: [],
 });
+watch(()=>app.ticketModalOpen,open=>{if(open){Object.assign(form,{requester:employees.value[0]?.name||'',department:employees.value[0]?.owner||'',title:'',description:'',category:'Hardware',priority:'Média',equipment:app.ticketEquipment||'Não informado',status:'Aberto',technician:'Não atribuído',channel:'Portal',deadline:'',messages:[]});attachments.value=[];internalNotes.value='';errors.value={};app.ticketEquipment=''}});
 function save() {
   errors.value = {};
-  if (!form.title) errors.value.title = "Informe um título.";
-  if (form.description.length < 10)
+  if (!form.title.trim()) errors.value.title = "Informe um título.";
+  if (form.description.trim().length < 10)
     errors.value.description =
       "Descreva o problema com pelo menos 10 caracteres.";
   if (Object.keys(errors.value).length) return;
-  const ticket = store.create({ ...form });
+  if(reading.value)return;
+  if(!form.requester.trim()||!form.department.trim()){app.toast('Dados incompletos','Informe solicitante e setor.','error');return}
+  try {
+  const ticket = store.create({ ...form,title:form.title.trim(),description:form.description.trim(),deadline:form.deadline?new Date(form.deadline).toISOString():'',attachments:[...attachments.value],messages:internalNotes.value.trim()?[{id:Date.now(),author:auth.user?.name||'Equipe de TI',text:internalNotes.value.trim(),at:new Date().toISOString(),internal:true}]:[] });
   app.ticketModalOpen = false;
   app.toast("Chamado criado", `${ticket.protocol} foi registrado com sucesso.`);
   form.title = "";
   form.description = "";
+  attachments.value=[];internalNotes.value='';
+  }catch(error){app.toast('Não foi possível criar o chamado',error instanceof Error?error.message:String(error),'error')}
 }
 </script>
 <template>
@@ -59,19 +70,12 @@ function save() {
         <div>
           <label class="label">Solicitante *</label
           ><select v-model="form.requester" class="field">
-            <option>Mariana Costa</option>
-            <option>Ricardo Nunes</option>
-            <option>Paula Freitas</option>
+            <option v-for="person in employees" :key="person.id">{{person.name}}</option>
           </select>
         </div>
         <div>
           <label class="label">Setor *</label
-          ><select v-model="form.department" class="field">
-            <option>Secretaria</option>
-            <option>Administração</option>
-            <option>Financeiro</option>
-            <option>Hangar</option>
-          </select>
+          ><input v-model="form.department" class="field"/>
         </div>
         <div class="col-span-2">
           <label class="label">Título *</label
@@ -118,9 +122,7 @@ function save() {
           <label class="label">Equipamento</label
           ><select v-model="form.equipment" class="field">
             <option>Não informado</option>
-            <option>DESK-034</option>
-            <option>IMP-012</option>
-            <option>NB-008</option>
+            <option v-for="item in equipment" :key="item.id">{{item.code}}</option>
           </select>
         </div>
         <div>
@@ -135,10 +137,12 @@ function save() {
         <div class="col-span-2">
           <label class="label">Observações internas</label
           ><textarea
+            v-model="internalNotes"
             class="field h-16 py-2"
             placeholder="Visível apenas para a equipe de TI"
           />
         </div>
+        <div class="col-span-2"><label class="label">Prazo (opcional)</label><input v-model="form.deadline" type="datetime-local" class="field"/><p class="mt-1 text-xs text-slate-500">Defina o prazo acordado para este atendimento.</p></div>
         <div
           class="col-span-2 flex items-center justify-between border-t pt-4 dark:border-slate-700"
         >
@@ -150,7 +154,7 @@ function save() {
               @click="app.ticketModalOpen = false"
             >
               Cancelar</button
-            ><button class="btn btn-primary">Criar chamado</button>
+            ><button class="btn btn-primary" :disabled="reading">{{reading?'Lendo anexos...':'Criar chamado'}}</button>
           </div>
         </div>
       </form>

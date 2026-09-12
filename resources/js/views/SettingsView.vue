@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, watch } from "vue";
+import { ref, reactive, watch, computed } from "vue";
 import {useRoute,useRouter} from 'vue-router';
 import {storage} from '@/adapters/storage';
+import {SettingsService} from '@/services/settings';
+import logoUrl from '../../../assets/icon.png';
 import PageHeader from "@/components/shared/PageHeader.vue";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
@@ -20,23 +22,20 @@ import {
   Download,
   RefreshCw,
   Save,
-<<<<<<< HEAD
   UserRound,
   Camera,
-} from "lucide-vue-next";
-const app = useAppStore(),
-  auth = useAuthStore(),
-  route=useRoute(),router=useRouter(),
-  section = ref(String(route.meta.settingsSection||"Organização"));
-const profile=reactive({name:auth.user?.name||'',email:auth.user?.email||'',role:auth.user?.role||'',department:auth.user?.department||'',unit:auth.user?.unit||'',phone:'(32) 99981-1010',extension:'204',photo:storage.get('profilePhoto','')});
-=======
   Upload,
   Trash2,
   Plane,
 } from "lucide-vue-next";
 const app = useAppStore(),
   auth = useAuthStore(),
-  section = ref("Organização");
+  route=useRoute(),router=useRouter(),
+  section = ref(String(route.meta.settingsSection||"Organização"));
+const profile=reactive({name:auth.user?.name||'',email:auth.user?.email||'',role:auth.user?.role||'',department:auth.user?.department||'',unit:auth.user?.unit||'',phone:auth.user?.phone||'',extension:auth.user?.extension||'',photo:auth.user?.avatar||storage.get('profilePhoto','')});
+const organization=reactive(SettingsService.organization()),preferences=reactive(SettingsService.preferences());
+watch(section,value=>{if(!preferences[value])preferences[value]={enabled:[true,true,false],userStatuses:['Ativo','Ativo','Ativo'],value:value==='WhatsApp'?'(32) 99999-0000':value==='Armazenamento e backup'?'AeroTI/data':value,mode:'Somente demonstração'}},{immediate:true});
+const currentPreferences=computed(()=>preferences[section.value]);
 const fileInput = ref<HTMLInputElement | null>(null);
 const logoError = ref("");
 function onLogoChange(e: Event) {
@@ -56,17 +55,16 @@ function onLogoChange(e: Event) {
   }
   const reader = new FileReader();
   reader.onload = () => {
-    app.setLogo(reader.result as string);
-    app.toast("Logo atualizada", "A nova logo foi aplicada em todo o sistema.");
+    try{app.setLogo(reader.result as string);app.toast("Logo atualizada", "A nova logo foi aplicada em todo o sistema.")}catch{logoError.value="Não foi possível salvar a imagem. Verifique o espaço disponível."}
   };
   reader.readAsDataURL(file);
 }
 function removeLogo() {
   app.setLogo(null);
   if (fileInput.value) fileInput.value.value = "";
-  app.toast("Logo removida", "O ícone padrão voltou a ser exibido.", "info");
+  app.toast("Logo removida", "A logo padrão voltou a ser exibida.", "info");
 }
->>>>>>> refs/remotes/origin/main
+
 const sections = [
   ["Meu perfil", UserRound],
   ["Organização", Building2],
@@ -81,7 +79,8 @@ const sections = [
   ["Aplicação Desktop", MonitorCog],
 ];
 watch(()=>route.meta.settingsSection,value=>{if(value)section.value=String(value)});watch(section,value=>{if(value==='Meu perfil'&&route.path!=='/configuracoes/perfil')router.push('/configuracoes/perfil');else if(value!=='Meu perfil'&&route.path==='/configuracoes/perfil')router.push('/configuracoes')});
-function selectPhoto(e:Event){const file=(e.target as HTMLInputElement).files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{profile.photo=String(reader.result);storage.set('profilePhoto',profile.photo)};reader.readAsDataURL(file)}function saveSettings(){if(section.value==='Meu perfil'&&auth.user){auth.user={...auth.user,name:profile.name,email:profile.email,role:profile.role,department:profile.department,unit:profile.unit,avatar:profile.photo};storage.set('session',auth.user)}app.toast(section.value==='Meu perfil'?'Perfil atualizado':'Configurações salvas','As alterações foram salvas localmente.')}
+function selectPhoto(e:Event){const file=(e.target as HTMLInputElement).files?.[0];if(!file)return;if(!['image/png','image/jpeg'].includes(file.type)||file.size>1024*1024){app.toast('Imagem inválida','Use PNG ou JPG de até 1 MB.','error');return}const reader=new FileReader();reader.onload=()=>{profile.photo=String(reader.result)};reader.onerror=()=>app.toast('Falha na imagem','Não foi possível ler a foto.','error');reader.readAsDataURL(file)}
+function saveSettings(){try{if(section.value==='Meu perfil'&&auth.user){if(!profile.name.trim()||!/^\S+@\S+\.\S+$/.test(profile.email)){app.toast('Dados inválidos','Informe nome e e-mail válido.','error');return}const updated={...auth.user,name:profile.name.trim(),email:profile.email,role:profile.role,department:profile.department,unit:profile.unit,phone:profile.phone,extension:profile.extension,avatar:profile.photo};storage.set('profile',updated);storage.set('session',updated);auth.user=updated}else if(section.value==='Organização'){SettingsService.saveOrganization(organization)}else{SettingsService.savePreferences(preferences)}app.toast(section.value==='Meu perfil'?'Perfil atualizado':'Configurações salvas','As alterações foram salvas localmente.')}catch(error){app.toast('Falha ao salvar',error instanceof Error?error.message:String(error),'error')}}
 </script>
 <template>
   <PageHeader
@@ -119,23 +118,23 @@ function selectPhoto(e:Event){const file=(e.target as HTMLInputElement).files?.[
         <div class="mt-6 grid max-w-2xl grid-cols-2 gap-4">
           <div class="col-span-2">
             <label class="label">Nome da organização</label
-            ><input class="field" value="Aeroclube de Juiz de Fora" />
+            ><input class="field" v-model="organization.name" />
           </div>
           <div>
             <label class="label">Nome do sistema</label
-            ><input class="field" value="AeroTI" />
+            ><input class="field" v-model="organization.systemName" />
           </div>
           <div>
             <label class="label">Unidade</label
-            ><input class="field" :value="auth.user?.unit" />
+            ><input class="field" v-model="organization.unit" />
           </div>
           <div>
             <label class="label">E-mail de suporte</label
-            ><input class="field" value="ti@aeroclube.local" />
+            ><input class="field" v-model="organization.email" />
           </div>
           <div>
             <label class="label">Telefone</label
-            ><input class="field" value="(32) 3233-1000" />
+            ><input class="field" v-model="organization.phone" />
           </div>
         </div>
         <div class="mt-6 max-w-2xl border-t pt-5 dark:border-slate-700">
@@ -145,11 +144,10 @@ function selectPhoto(e:Event){const file=(e.target as HTMLInputElement).files?.[
               class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-slate-50 dark:border-slate-600 dark:bg-slate-700"
             >
               <img
-                v-if="app.logo"
-                :src="app.logo"
+                :src="app.logo || logoUrl"
                 alt="Logo atual"
                 class="size-full object-contain"
-              /><Plane v-else class="size-7 -rotate-12 text-slate-400" />
+              />
             </div>
             <div>
               <div class="flex flex-wrap gap-2">
@@ -278,7 +276,7 @@ function selectPhoto(e:Event){const file=(e.target as HTMLInputElement).files?.[
       ><template v-else
         ><h2 class="text-base font-bold">{{ section }}</h2>
         <p class="mt-1 text-xs text-slate-500">
-          Preferências demonstrativas salvas ao usar o botão principal.
+          Preferências salvas neste computador. Integrações e permissões são demonstrativas nesta versão.
         </p>
         <div class="mt-6 max-w-2xl space-y-3">
           <div
@@ -326,11 +324,11 @@ function selectPhoto(e:Event){const file=(e.target as HTMLInputElement).files?.[
             <input
               :id="`setting-${i}`"
               type="checkbox"
-              :checked="i < 2"
+              v-model="currentPreferences.enabled[i]"
             /><label :for="`setting-${i}`" class="flex-1 text-sm font-medium">{{
               item
             }}</label
-            ><select v-if="section === 'Usuários'" class="field w-40">
+            ><select v-if="section === 'Usuários'" v-model="currentPreferences.userStatuses[i]" class="field w-40">
               <option>Ativo</option>
               <option>Bloqueado</option></select
             ><span v-else class="text-[11px] text-slate-400">Configurável</span>
@@ -340,18 +338,12 @@ function selectPhoto(e:Event){const file=(e.target as HTMLInputElement).files?.[
               <label class="label">Valor padrão</label
               ><input
                 class="field"
-                :value="
-                  section === 'WhatsApp'
-                    ? '(32) 99999-0000'
-                    : section === 'Armazenamento e backup'
-                      ? 'AeroTI/data'
-                      : section
-                "
+                v-model="currentPreferences.value"
               />
             </div>
             <div>
               <label class="label">Modo</label
-              ><select class="field">
+              ><select v-model="currentPreferences.mode" class="field">
                 <option>Ativo</option>
                 <option>Somente demonstração</option>
                 <option>Desativado</option>

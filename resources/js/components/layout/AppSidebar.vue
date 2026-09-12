@@ -35,8 +35,8 @@ const items = [
     class="fixed inset-y-0 left-0 z-30 flex flex-col bg-[#12233f] text-slate-300 transition-all duration-200"
     :class="app.sidebarCollapsed ? 'w-[68px]' : 'w-[232px]'"
   >
-    <div class="flex h-16 items-center border-b border-white/10 px-[18px]">
-      <img :src="logoUrl" alt="Aeroclube Juiz de Fora" class="object-contain" :class="app.sidebarCollapsed?'w-8':'w-[150px]'"/>
+    <div class="flex h-24 shrink-0 items-center justify-center px-3">
+      <img :src="app.logo || logoUrl" alt="Aeroclube Juiz de Fora" class="mt-3 block h-auto max-h-[84px] max-w-full object-contain" :class="app.sidebarCollapsed?'w-10':'w-[168px]'"/>
     </div>
     <nav class="scrollbar flex-1 overflow-y-auto px-2 py-3">
       <router-link

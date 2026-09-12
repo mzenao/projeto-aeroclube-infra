@@ -1,0 +1,3 @@
+export function parseDate(value?:string):Date|null{if(!value)return null;const match=value.match(/^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{1,3}):(\d{2}))?$/),day=value.match(/^(\d{4})-(\d{2})-(\d{2})$/);const date=match?new Date(+match[3],+match[2]-1,+match[1],+(match[4]||0),+(match[5]||0)):day?new Date(+day[1],+day[2]-1,+day[3]):new Date(value);return Number.isNaN(date.getTime())?null:date}
+export function formatDate(value?:string){const date=parseDate(value);return date?date.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):value||'Não informado'}
+export function sameDay(value:string,date=new Date()){return parseDate(value)?.toDateString()===date.toDateString()}

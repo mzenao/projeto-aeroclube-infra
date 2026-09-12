@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useTicketStore } from "@/stores/tickets";
 import { useAppStore } from "@/stores/app";
 import { WhatsAppService, EmailService } from "@/services";
+import {readAttachments} from '@/services/attachments';
+import {formatDate} from '@/utils/dates';
+import {useAuthStore} from '@/stores/auth';
 import BaseBadge from "@/components/base/BaseBadge.vue";
 import {
   ArrowLeft,
@@ -19,43 +22,20 @@ const route = useRoute(),
   app = useAppStore();
 const ticket = computed(
   () =>
-    store.items.find((t) => t.id === Number(route.params.id)) || store.items[0],
+    store.items.find((t) => t.id === Number(route.params.id)),
 );
-const reply = ref(""),
-  internal = ref(false), attachments=ref<string[]>([]);
-const externalChannel=computed(()=>['WhatsApp','E-mail'].includes(ticket.value.channel));
-function attach(e:Event){const files=Array.from((e.target as HTMLInputElement).files||[]);attachments.value.push(...files.map(f=>f.name));app.toast('Arquivo anexado',files.map(f=>f.name).join(', '))}
-async function send() {
-  if (!reply.value.trim()) return;
-  const messages = [
-    ...(ticket.value.messages || []),
-    {
-      id: Date.now(),
-      author: "Lucas Almeida",
-      text: reply.value,
-      at: "Agora",
-      internal: internal.value,
-    },
-  ];
-  store.update(ticket.value.id, { messages, updatedAt: "Agora" });
-  if(!internal.value){if(ticket.value.channel==='WhatsApp')await WhatsAppService.send('',reply.value);else await EmailService.send('',reply.value)}
-  reply.value = "";
-  app.toast(
-    internal.value ? "Nota adicionada" : "Resposta enviada",
-    internal.value
-      ? "A nota interna foi registrada."
-      : "O solicitante será notificado.",
-  );
-}
-function changeStatus(e: Event) {
-  store.update(ticket.value.id, {
-    status: (e.target as HTMLSelectElement).value as any,
-  });
-  app.toast("Status atualizado", "A alteração foi registrada no histórico.");
-}
-function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no atendimento:','30')||'0';app.toast('Tempo registrado',`${minutes} minutos adicionados.`)}
+const reply=ref(''),internal=ref(false),reading=ref(false),auth=useAuthStore();
+const externalChannel=computed(()=>['WhatsApp','E-mail'].includes(ticket.value?.channel||''));
+const attachments=computed(()=>ticket.value?.attachments||[]);
+watch(()=>route.params.id,()=>{reply.value='';internal.value=false});
+async function attach(e:Event){const current=ticket.value;if(!current)return;reading.value=true;try{const files=await readAttachments(Array.from((e.target as HTMLInputElement).files||[]),current.attachments||[]);store.update(current.id,{attachments:[...(current.attachments||[]),...files]});app.toast('Anexos salvos','Os arquivos foram armazenados neste chamado.')}catch(error){app.toast('Falha no anexo',error instanceof Error?error.message:String(error),'error')}finally{reading.value=false;(e.target as HTMLInputElement).value=''}}
+async function send(){const current=ticket.value;if(!current||!reply.value.trim())return;const at=new Date().toISOString(),isInternal=internal.value||!externalChannel.value;try{store.update(current.id,{messages:[...(current.messages||[]),{id:Date.now(),author:auth.user?.name||'Equipe de TI',text:reply.value.trim(),at,internal:isInternal}]});if(!isInternal){if(current.channel==='WhatsApp')await WhatsAppService.send('',reply.value);else await EmailService.send('',reply.value)}reply.value='';app.toast(isInternal?'Nota registrada':'Resposta registrada',isInternal?'A nota interna foi salva.':'Mensagem salva; o envio externo é simulado neste protótipo.')}catch(error){app.toast('Não foi possível salvar',error instanceof Error?error.message:String(error),'error')}}
+function changeStatus(e:Event){if(!ticket.value)return;store.update(ticket.value.id,{status:(e.target as HTMLSelectElement).value as any});app.toast('Status atualizado','A alteração foi registrada no histórico.')}
+function registerTime(){const current=ticket.value;if(!current)return;const answer=globalThis.prompt?.('Minutos gastos no atendimento:','30');if(answer==null)return;const minutes=Number(answer);if(!Number.isFinite(minutes)||minutes<=0){app.toast('Tempo inválido','Informe uma quantidade positiva de minutos.','error');return}try{store.update(current.id,{timeEntries:[...(current.timeEntries||[]),{id:crypto.randomUUID(),author:auth.user?.name||'Equipe de TI',minutes,at:new Date().toISOString()}]});app.toast('Tempo registrado',minutes+' minutos adicionados.')}catch(error){app.toast('Falha ao registrar tempo',error instanceof Error?error.message:String(error),'error')}}
 </script>
 <template>
+  <div v-if="!ticket" class="card p-8"><h1 class="text-xl font-bold">Chamado não encontrado</h1><router-link to="/chamados" class="btn btn-secondary mt-4">Voltar para chamados</router-link></div>
+  <template v-else>
   <div class="mb-4">
     <router-link
       to="/chamados"
@@ -74,7 +54,7 @@ function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no ate
         </div>
         <h1 class="mt-2 text-xl font-bold">{{ ticket.title }}</h1>
         <p class="mt-1 text-xs text-slate-500">
-          Aberto por {{ ticket.requester }} · {{ ticket.openedAt }}
+          Aberto por {{ ticket.requester }} · {{ formatDate(ticket.openedAt) }}
         </p>
       </div>
       <div class="flex gap-2">
@@ -100,7 +80,7 @@ function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no ate
           {{ ticket.description }}
         </p>
       </section>
-      <section v-if="externalChannel" class="card">
+      <section class="card">
         <div class="border-b px-5 py-4 dark:border-slate-700">
           <h2 class="text-sm font-bold">Conversa</h2>
           <p class="text-xs text-slate-500">
@@ -132,7 +112,7 @@ function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no ate
                 <b>{{ m.author }}</b
                 ><span v-if="m.internal" class="text-amber-700"
                   >Nota interna</span
-                ><span class="text-slate-400">{{ m.at }}</span>
+                ><span class="text-slate-400">{{ formatDate(m.at) }}</span>
               </div>
               <p class="leading-5">{{ m.text }}</p>
             </div>
@@ -141,7 +121,7 @@ function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no ate
         <div class="border-t p-4 dark:border-slate-700">
           <div class="mb-2 flex gap-4 text-xs">
             <label
-              ><input v-model="internal" type="radio" :value="false" />
+              ><input v-model="internal" type="radio" :value="false" :disabled="!externalChannel" />
               Responder</label
             ><label
               ><input v-model="internal" type="radio" :value="true" /> Nota
@@ -158,32 +138,27 @@ function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no ate
               <Paperclip class="size-4" />Anexar<input type="file" multiple class="hidden" @change="attach"/></label
             ><button class="btn btn-secondary ml-2" @click="app.toast('Canal externo',`A resposta será enviada por ${ticket.channel}.`,'info')">
               <MessageCircle class="size-4" />WhatsApp</button
-            ><button class="btn btn-primary ml-auto" @click="send">
+            ><button class="btn btn-primary ml-auto" :disabled="reading" @click="send">
               <Send class="size-4" />Enviar
             </button>
           </div>
         </div>
       </section>
-      <section v-else class="card p-5"><h2 class="text-sm font-bold">Comunicação</h2><p class="mt-2 text-sm text-slate-500">Este chamado foi aberto diretamente na plataforma. Não há conversa externa; use notas internas e o histórico para registrar o atendimento.</p><textarea v-model="reply" class="field mt-4 h-20 py-2" placeholder="Adicionar nota interna..."/><button class="btn btn-primary mt-2" @click="internal=true;send()">Registrar nota</button></section>
-      <section v-if="attachments.length" class="card p-5"><h2 class="text-sm font-bold">Anexos</h2><div v-for="file in attachments" :key="file" class="mt-2 rounded border p-2 text-xs dark:border-slate-600">{{file}}</div></section>
+      <section v-if="attachments.length" class="card p-5"><h2 class="text-sm font-bold">Anexos</h2><a v-for="file in attachments" :key="file.id" :href="file.dataUrl" :download="file.name" class="mt-2 block rounded border p-2 text-xs text-blue-600 dark:border-slate-600">{{file.name}} · Baixar</a></section>
       <section class="card p-5">
-        <h2 class="text-sm font-bold">Atividades e histórico</h2>
+        <h2 class="text-sm font-bold">Atividades e histórico</h2><p v-if="!ticket.history?.length" class="mt-3 text-xs text-slate-500">Nenhum evento registrado.</p><div v-for="entry in ticket.timeEntries || []" :key="entry.id" class="mt-3 text-xs">{{entry.minutes}} minutos · {{entry.author}} · {{formatDate(entry.at)}}</div>
         <div
-          v-for="a in [
-            'Lucas Almeida iniciou o atendimento',
-            'Prioridade alterada de Média para Crítica',
-            'Chamado criado via ' + ticket.channel,
-          ]"
-          :key="a"
+          v-for="a in ticket.history || []"
+          :key="a.id"
           class="mt-4 flex gap-3 text-xs"
         >
           <div
             class="mt-1 size-2 rounded-full bg-blue-500 ring-4 ring-blue-50"
           />
           <div>
-            <b>{{ a }}</b>
+            <b>{{ a.description }}</b>
             <div class="text-slate-400">
-              Hoje, 09:{{ 20 + Math.floor(Math.random() * 30) }}
+              {{ formatDate(a.at) }} · {{ a.author }}
             </div>
           </div>
         </div>
@@ -252,8 +227,8 @@ function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no ate
             ['Equipamento', ticket.equipment],
             ['Categoria', ticket.category],
             ['Canal', ticket.channel],
-            ['Prazo', ticket.deadline],
-            ['Última atualização', ticket.updatedAt],
+            ['Prazo', ticket.deadline?formatDate(ticket.deadline):'Sem prazo definido'],
+            ['Última atualização', formatDate(ticket.updatedAt)],
           ]"
           :key="String(k)"
           class="py-2"
@@ -267,4 +242,5 @@ function registerTime(){const minutes=globalThis.prompt?.('Minutos gastos no ate
       </button>
     </aside>
   </div>
+  </template>
 </template>

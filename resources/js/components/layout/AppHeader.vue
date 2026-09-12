@@ -10,6 +10,9 @@ import {
 } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
+import {ModuleService,StorageService} from '@/services';
+import {useTicketStore} from '@/stores/tickets';
+import {parseDate} from '@/utils/dates';
 import { useRouter } from "vue-router";
 const app = useAppStore(),
   auth = useAuthStore(),
@@ -53,35 +56,19 @@ onUnmounted(() => {
   document.removeEventListener("click", onClickOutside);
   document.removeEventListener("keydown", onEscape);
 });
-const notifications = ref([
-  {
-    id: 1,
-    title: "Servidor de arquivos indisponível",
-    detail: "Chamado TI-0241 atualizado",
-    to: "/chamados/8",
-    read: false,
-  },
-  {
-    id: 2,
-    title: "Preventiva atrasada",
-    detail: "Nobreak da sala técnica",
-    to: "/manutencoes",
-    read: false,
-  },
-  {
-    id: 3,
-    title: "Estoque abaixo do mínimo",
-    detail: "Toner Brother TN-3472",
-    to: "/estoque",
-    read: false,
-  },
-]);
+const ticketStore=useTicketStore(),readNotifications=ref<string[]>(StorageService.get('readNotifications',[]));
+const notifications=computed(()=>[
+  ...ticketStore.items.filter(t=>t.priority==='Crítica'&&!['Resolvido','Cancelado'].includes(t.status)).map(t=>({id:'ticket:'+t.id+':'+t.updatedAt,title:t.title,detail:t.protocol+' · '+t.status,to:'/chamados/'+t.id})),
+  ...ModuleService.list('maintenance').filter(m=>!['Concluída','Cancelada'].includes(m.status)&&(m.status==='Atrasada'||(parseDate(m.scheduledAt)?.getTime()??Infinity)<Date.now())).map(m=>({id:'maintenance:'+m.id+':'+m.updatedAt,title:'Manutenção atrasada',detail:m.name,to:'/manutencoes/'+m.id})),
+  ...ModuleService.list('inventory').filter(m=>m.status==='Estoque baixo').map(m=>({id:'inventory:'+m.id+':'+m.updatedAt,title:'Estoque abaixo do mínimo',detail:m.name,to:'/estoque/'+m.id})),
+].map(n=>({...n,read:readNotifications.value.includes(n.id)})));
+function markRead(ids:string[]){const next=[...new Set([...readNotifications.value,...ids])];StorageService.set('readNotifications',next);readNotifications.value=next}
 function search() {
   if (!query.value.trim()) return;
-  router.push({ path: "/chamados", query: { q: query.value } });
+  router.push({ path: "/busca", query: { q: query.value.trim() } });
 }
 function openNotification(n: any) {
-  n.read = true;
+  markRead([n.id]);
   notificationsOpen.value = false;
   router.push(n.to);
 }
@@ -128,7 +115,7 @@ function logout() {
             <b class="text-sm">Notificações</b
             ><button
               class="text-[11px] text-blue-600"
-              @click="notifications.forEach((n) => (n.read = true))"
+              @click="markRead(notifications.map(n=>n.id))"
             >
               <CheckCheck class="mr-1 inline size-3" />Marcar lidas
             </button>
@@ -172,11 +159,7 @@ function logout() {
           <div
             class="flex size-8 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xs font-bold text-blue-700"
           >
-<<<<<<< HEAD
-            <img v-if="auth.user?.avatar" :src="auth.user.avatar" alt="Foto do perfil" class="size-full object-cover"/><span v-else>{{auth.user?.name.split(' ').map(x=>x[0]).slice(0,2).join('')}}</span>
-=======
-            {{ initials }}
->>>>>>> refs/remotes/origin/main
+            <img v-if="auth.user?.avatar" :src="auth.user.avatar" alt="Foto do perfil" class="size-full object-cover"/><span v-else>{{ initials }}</span>
           </div>
           <div class="text-left">
             <div class="text-xs font-semibold">{{ auth.user?.name }}</div>
